@@ -3,7 +3,7 @@ module yk
 using Base.GMP.MPZ: sizeinbase, mpz_t
 using Base.GMP: CulongMax, ClongMax, libgmp
 
-export iroot
+
 
 if Clong == Int32
     const LargeInt = Union{Int64, Int128}
@@ -13,6 +13,9 @@ else
     const LargeUInt = UInt128
 end
 
+include("yk_gmp.jl")
+
+export iroot
 
 """
     iroot(x,n)::BigInt
@@ -46,18 +49,8 @@ julia>iroot(BigInt(2)^1000, 1000)
 # Notes
 This function uses GMP's `__gmpz_root` for efficiency.
 
-If `n` is extremely large and `x` is small in bit length, the result is simply `sign(x)`.
+When `n` is large relative to `x`, the result is just `sign(x)` as no `r^n` can exceed `x`
 """
-function iroot(x::BigInt, n::CulongMax)::BigInt
-    iszero(n) && throw(DomainError((x, n), "iroot(x, n) is undefined for n <= 0"))
-    if x < 0 && iseven(n)
-        throw(DomainError((x,n), "iroot(x, n) is  undefined for x<0 && even n"))
-    end
-    z = BigInt()
-    ccall((:__gmpz_root, libgmp), Cint, (mpz_t, mpz_t, Culong), z, x, n)
-    return z
-end
-
 function iroot(x::BigInt, n::ClongMax)::BigInt
     n <= 0 && throw(DomainError((x, n), "iroot(x, n) is undefined for n <= 0"))
     return iroot(x,Culong(n))
