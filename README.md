@@ -3,6 +3,7 @@
 hello I'm Y.K.
 
 GMPやMPFRにはあるのにJuliaで実装されていないような関数がいっぱいあると思ったのでそれを実装していきます。
+
 I thought there are a lot of functions that exist in GMP and MPFR but are not implemented in Julia, so I will implement them.
 
 
