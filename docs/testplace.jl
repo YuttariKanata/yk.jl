@@ -12,10 +12,18 @@ end
 gmpz(op::Symbol) = (Symbol(:__g, op), libgmp)
 
 # mpz_t -> BigInt
+# bitcnt_t -> bitcnt_t
 # Culong -> CulongMax
 # Clong -> ClongMax
-# bitcnt_t -> bitcnt_t
-cnv(op::Symbol) = op === :mpz_t ? :BigInt : (op === :bitcnt_t ? :bitcnt_t : Symbol(op, :Max))
+function cnv(op::Symbol)::Symbol
+    if op === :mpz_t
+        return :BigInt
+    elseif op === :bitcnt_t
+        return :bitcnt_t
+    else
+        Symbol(op, :Max)
+    end
+end
 
 
 # addmul, submul
@@ -46,6 +54,7 @@ for (fname, gmpname, ytype) in [
     end
 end
 
+
 # divexact
 for (fname, gmpname, ytype) in [
     (:divexact_mpz, :mpz_divexact,    :mpz_t ),
@@ -60,8 +69,10 @@ for (fname, gmpname, ytype) in [
     end
 end
 
+
 # mod_ul
 mod_ul(a::BigInt, b::CulongMax)::Culong = ccall((:__gmpz_fdiv_ui, libgmp), Culong, (mpz_t, Culong), a, b)
+
 
 # iscongruent
 for (fname, gmpname, ytype1, ytype2) in [
@@ -76,12 +87,14 @@ for (fname, gmpname, ytype1, ytype2) in [
     end
 end
 
+
 # powm_ui
 function powm_ul(base::BigInt,exp::CulongMax,mod::BigInt)
     rop = BigInt()
-    ccall((:__gmpz_powm_ui, libgmp), Cvoid, (mpz_t, mpz_t, Culong, mpz_t), rop, base, exp, mod)
+    ccall(gmpz(:mpz_powm_ui), Cvoid, (mpz_t, mpz_t, Culong, mpz_t), rop, base, exp, mod)
     return rop
 end
+
 
 # ui_pow_ui
 # If you are computing a power x^y between integers x,y that fits into Culong,
@@ -97,28 +110,30 @@ Useful for fast small exponentiation without promotion to `BigInt` until the fin
 """
 function pow_ul_ul(base::CulongMax, exp::CulongMax)::BigInt
     rop = BigInt()
-    ccall((:__gmpz_ui_pow_ui, libgmp), Cvoid, (mpz_t, Culong, Culong), rop, base, exp)
+    ccall(gmpz(:mpz_ui_pow_ui), Cvoid, (mpz_t, Culong, Culong), rop, base, exp)
     return rop
 end
+
 
 # root
 function iroot_ul(x::BigInt, n::CulongMax)::BigInt
     z = BigInt()
-    ccall((:__gmpz_root, libgmp), Cint, (mpz_t, mpz_t, Culong), z, x, n)
+    ccall(gmpz(:mpz_root), Cint, (mpz_t, mpz_t, Culong), z, x, n)
     return z
 end
 function rootrem_ul(x::BigInt, n::CulongMax)::BigInt
     rem = BigInt()
     root = BigInt()
-    ccall((:__gmpz_rootrem, libgmp), Cvoid, (mpz_t, mpz_t, mpz_t, Culong), root, rem, x, n)
+    ccall(gmpz(:mpz_rootrem), Cvoid, (mpz_t, mpz_t, mpz_t, Culong), root, rem, x, n)
     return (root, rem)
 end
 function sqrtrem(x::BigInt)::BigInt
     rem = BigInt()
     root = BigInt()
-    ccall((:__gmpz_sqrtrem, libgmp), Cvoid, (mpz_t, mpz_t, mpz_t), root, rem, x)
+    ccall(gmpz(:mpz_sqrtrem), Cvoid, (mpz_t, mpz_t, mpz_t), root, rem, x)
     return (root, rem)
 end
+
 
 # perfect power and square
 for (fname, gmpname) in [
@@ -132,20 +147,24 @@ for (fname, gmpname) in [
     end
 end
 
+
 # PRIME-related is already implemented in Primes.jl
 
-# gcd
+
+# gcd and lcm
 function gcd_ul(op1::BigInt, op2::CulongMax)::Culong
     iszero(op2) && throw(DomainError(op2, "0 cannot be specified for op2 in gcd_ul()"))
-    return ccall((:__gmpz_gcd_ui, libgmp), Culong, (Ptr{Cvoid}, mpz_t, Culong), C_NULL, op1, op2)
+    return ccall(gmpz(:mpz_gcd_ui), Culong, (Ptr{Cvoid}, mpz_t, Culong), C_NULL, op1, op2)
+end
+
+function lcm_ul(op1::BigInt, op2::CulongMax)::BigInt
+    rop = BigInt()
+    ccall(gmpz(:mpz_lcm_ui), Cvoid, (mpz_t, mpz_t, Culong), rop, op1, op2)
+    return rop
 end
 
 
-
-function jacobi(n::BigInt, k::BigInt)::Cint
-    return ccall((:__gmpz_jacobi, libgmp), Cint, (mpz_t, mpz_t), n, k)
-end
-
+# jacobi and kronecker
 for (fname, gmpname, ytype1, ytype2) in [
     (:jacobi,   :mpz_jacobi,   :mpz_t, :mpz_t),
     (:legendre, :mpz_legendre, :mpz_t, :mpz_t),
@@ -157,7 +176,7 @@ for (fname, gmpname, ytype1, ytype2) in [
 
     @eval begin
         function $fname(n::$(cnv(ytype1)),k::$(cnv(ytype2)))::Cint
-            return ccall($(gmpz(gmpname)), Cint, (ytype1, ytype2), n, k)
+            return ccall($(gmpz(gmpname)), Cint, ($ytype1, $ytype2), n, k)
         end
     end
 end
