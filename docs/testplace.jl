@@ -1,5 +1,5 @@
 using Base.GMP.MPZ: sizeinbase, mpz_t, bitcnt_t
-using Base.GMP: CulongMax, ClongMax, libgmp
+using Base.GMP: CulongMax, ClongMax, CdoubleMax, libgmp
 
 if Clong == Int32
     const LargeInt = Union{Int64, Int128}
@@ -15,6 +15,7 @@ gmpz(op::Symbol) = (Symbol(:__g, op), libgmp)
 # bitcnt_t -> bitcnt_t
 # Culong -> CulongMax
 # Clong -> ClongMax
+# Cdouble -> CdoubleMax
 function cnv(op::Symbol)::Symbol
     if op === :mpz_t
         return :BigInt
@@ -34,7 +35,7 @@ for (fname, gmpname, ytype) in [
     (:submul_ul!, :mpz_submul_ui, :Culong),]
 
     @eval begin
-        function $fname(z::BigInt, x::BigInt, y::$(cnv(ytype)))
+        function $fname(z::BigInt, x::BigInt, y::$(cnv(ytype)))::Nothing
             ccall($(gmpz(gmpname)), Cvoid, (mpz_t, mpz_t, $ytype), z, x, y)
         end
     end
@@ -91,7 +92,7 @@ end
 # powm_ui
 function powm_ul(base::BigInt,exp::CulongMax,mod::BigInt)
     rop = BigInt()
-    ccall(gmpz(:mpz_powm_ui), Cvoid, (mpz_t, mpz_t, Culong, mpz_t), rop, base, exp, mod)
+    ccall((:__gmpz_powm_ui, libgmp), Cvoid, (mpz_t, mpz_t, Culong, mpz_t), rop, base, exp, mod)
     return rop
 end
 
@@ -110,7 +111,7 @@ Useful for fast small exponentiation without promotion to `BigInt` until the fin
 """
 function pow_ul_ul(base::CulongMax, exp::CulongMax)::BigInt
     rop = BigInt()
-    ccall(gmpz(:mpz_ui_pow_ui), Cvoid, (mpz_t, Culong, Culong), rop, base, exp)
+    ccall((:__gmpz_ui_pow_ui, libgmp), Cvoid, (mpz_t, Culong, Culong), rop, base, exp)
     return rop
 end
 
@@ -118,19 +119,19 @@ end
 # root
 function iroot_ul(x::BigInt, n::CulongMax)::BigInt
     z = BigInt()
-    ccall(gmpz(:mpz_root), Cint, (mpz_t, mpz_t, Culong), z, x, n)
+    ccall((:__gmpz_root, libgmp), Cint, (mpz_t, mpz_t, Culong), z, x, n)
     return z
 end
-function rootrem_ul(x::BigInt, n::CulongMax)::BigInt
+function rootrem_ul(x::BigInt, n::CulongMax)::Tuple{BigInt, BigInt}
     rem = BigInt()
     root = BigInt()
-    ccall(gmpz(:mpz_rootrem), Cvoid, (mpz_t, mpz_t, mpz_t, Culong), root, rem, x, n)
+    ccall((:__gmpz_rootrem, libgmp), Cvoid, (mpz_t, mpz_t, mpz_t, Culong), root, rem, x, n)
     return (root, rem)
 end
-function sqrtrem(x::BigInt)::BigInt
+function sqrtrem(x::BigInt)::Tuple{BigInt, BigInt}
     rem = BigInt()
     root = BigInt()
-    ccall(gmpz(:mpz_sqrtrem), Cvoid, (mpz_t, mpz_t, mpz_t), root, rem, x)
+    ccall((:__gmpz_sqrtrem, libgmp), Cvoid, (mpz_t, mpz_t, mpz_t), root, rem, x)
     return (root, rem)
 end
 
@@ -142,7 +143,7 @@ for (fname, gmpname) in [
 
     @eval begin
         function $fname(n::BigInt)::Bool
-            !iszero(ccall($(gmpz(gmpname)), Cint, (mpz_t,), n))
+            return !iszero(ccall($(gmpz(gmpname)), Cint, (mpz_t,), n))
         end
     end
 end
@@ -151,15 +152,15 @@ end
 # PRIME-related is already implemented in Primes.jl
 
 
+
 # gcd and lcm
 function gcd_ul(op1::BigInt, op2::CulongMax)::Culong
     iszero(op2) && throw(DomainError(op2, "0 cannot be specified for op2 in gcd_ul()"))
-    return ccall(gmpz(:mpz_gcd_ui), Culong, (Ptr{Cvoid}, mpz_t, Culong), C_NULL, op1, op2)
+    return ccall((:__gmpz_gcd_ui, libgmp), Culong, (Ptr{Cvoid}, mpz_t, Culong), C_NULL, op1, op2)
 end
-
 function lcm_ul(op1::BigInt, op2::CulongMax)::BigInt
     rop = BigInt()
-    ccall(gmpz(:mpz_lcm_ui), Cvoid, (mpz_t, mpz_t, Culong), rop, op1, op2)
+    ccall((:__gmpz_lcm_ui, libgmp), Cvoid, (mpz_t, mpz_t, Culong), rop, op1, op2)
     return rop
 end
 
@@ -180,3 +181,91 @@ for (fname, gmpname, ytype1, ytype2) in [
         end
     end
 end
+
+
+# remove factor
+function remove_factor(op::BigInt, f::BigInt)::Tuple{BigInt,bitcnt_t}
+    rop = BigInt()
+    cnt = ccall((:__gmpz_remove, libgmp), bitcnt_t, (mpz_t, mpz_t, mpz_t), rop, op, f)
+    return (rop, cnt)
+end
+
+
+# factorial
+function fac2_ul(n::CulongMax)::BigInt
+    rop = BigInt()
+    ccall((:__gmpz_2fac_ui, libgmp), Cvoid, (mpz_t, Culong), rop, n)
+    return rop
+end
+function facm_ul(n::CulongMax, m::CulongMax)::BigInt
+    rop = BigInt()
+    ccall((:__gmpz_mfac_uiui, libgmp), Cvoid, (mpz_t, Culong, Culong), rop, n, m)
+    return rop
+end
+function primorial_ul(n::CulongMax)::BigInt
+    rop = BigInt()
+    ccall((:__gmpz_primorial_ui, libgmp), Cvoid, (mpz_t, Culong), rop, n)
+    return rop
+end
+
+
+# binomial
+function binomial_ulul(n::CulongMax, k::CulongMax)::BigInt
+    rop = BigInt()
+    ccall((:__gmpz_bin_uiui, libgmp), Cvoid, (mpz_t, Culong, Culong), rop, n, k)
+    return rop
+end
+
+
+# Fibonacci and Lucas
+for (fname, gmpname) in [
+    (:fibonacci_ul, :mpz_fib_ui   )
+    (:lucas_ul    , :mpz_lucnum_ui)]
+    
+    @eval begin
+        function $fname(n::Culong)::BigInt
+            rop = BigInt()
+            ccall($(gmpz(gmpname)), Cvoid, (mpz_t, Culong), rop, n)
+            return rop
+        end
+    end
+end
+for (fname, gmpname) in [
+    (:fibonacci2_ul, :mpz_fib2_ui   )
+    (:lucas2_ul    , :mpz_lucnum2_ui)]
+    
+    @eval begin
+        function $fname(n::Culong)::Tuple{BigInt,BigInt}
+            rop = BigInt()
+            ropsub1 = BigInt()
+            ccall($(gmpz(gmpname)), Cvoid, (mpz_t, mpz_t, Culong), rop, ropsub1, n)
+            return (rop, ropsub1)
+        end
+    end
+end
+
+
+# cmpabs
+for (gmpname, ytype) in [
+    (:mpz_cmpabs   ,:mpz_t )
+    (:mpz_cmpabs_d ,:Cdouble)
+    (:mpz_copabs_ui,:Culong )]
+    
+    @eval begin
+        function cmpabs(op1::BigInt, op2::$(cnv(ytype)))::Cint
+            return ccall($(gmpz(gmpname)), Cvoid, (mpz_t, $ytype), op1, op2)
+        end
+    end
+end
+
+
+# sign
+# It can be achieved with x.size without the need to implement mpz_sgn(x).
+
+
+# hamming distance
+function hamdist(op1::BigInt, op2::BigInt)::bitcnt_t
+    return ccall((:__gmpz_hamdist, libgmp), bitcnt_t, (mpz_t, mpz_t), op1, op2)
+end
+
+

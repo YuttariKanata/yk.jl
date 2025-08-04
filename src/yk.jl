@@ -60,7 +60,7 @@ function iroot(x::BigInt,n::Union{LargeInt, LargeUInt})::BigInt
     if n > typemax(Culong)
         if sizeinbase(x,2) <= n
             if x < 0 && iseven(n)
-                throw(DomainError((x,n), "iroot(x, n) is  undefined for x<0 && even n"))
+                throw(DomainError((x,n), "iroot(x, n) is undefined for x<0 && even n"))
             else
                 return sign(x)
             end
@@ -77,7 +77,7 @@ function iroot(x::BigInt,n::BigInt)::BigInt
         n <= 0 && throw(DomainError((x, n), "iroot(x, n) is undefined for n <= 0"))
         if sizeinbase(x,2) <= n
             if x < 0 && iseven(n)
-                throw(DomainError((x,n), "iroot(x, n) is  undefined for x<0 && even n"))
+                throw(DomainError((x,n), "iroot(x, n) is undefined for x<0 && even n"))
             else
                 return sign(x)
             end
