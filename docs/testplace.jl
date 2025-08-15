@@ -269,3 +269,29 @@ function hamdist(op1::BigInt, op2::BigInt)::bitcnt_t
 end
 
 
+# clrbit combit
+function clrbit!(x::BigInt, a::bitcnt_t)
+    ccall((:__gmpz_clrbit, libgmp), Cvoid, (mpz_t, bitcnt_t), x, a)
+    return x
+end
+function combit!(x::BigInt, a::bitcnt_t)
+    ccall((:__gmpz_combit, libgmp), Cvoid, (mpz_t, bitcnt_t), x, a)
+    return x
+end
+
+
+# fits_p
+for (gmpname, ytype) in [
+    (:mpz_fits_ulong_p,  :Culong )
+    (:mpz_fits_slong_p,  :Clong  )
+    (:mpz_fits_uint_p,   :Cuint  )
+    (:mpz_fits_sint_p,   :Cint   )
+    (:mpz_fits_ushort_p, :Cushort)
+    (:mpz_fits_sshort_p, :Cshort )]
+
+    @eval begin
+        function ismpzfit(op::BigInt, ::Type{$ytype})::Bool
+            return !iszero(ccall($(gmpz(gmpname)), Cint, (mpz_t,), op))
+        end
+    end 
+end

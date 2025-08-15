@@ -1,17 +1,6 @@
 module yk
 
-using Base.GMP.MPZ: sizeinbase, mpz_t
-using Base.GMP: CulongMax, ClongMax, libgmp
 
-
-
-if Clong == Int32
-    const LargeInt = Union{Int64, Int128}
-    const LargeUInt = Union{UInt64, UInt128}
-else
-    const LargeInt = Int128
-    const LargeUInt = UInt128
-end
 
 include("yk_gmp.jl")
 
